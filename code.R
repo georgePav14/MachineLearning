@@ -128,7 +128,7 @@ res
 
 # plot the roc curve
 plot(res[,2],res[,1], xlab="FN", ylab="TP", type="l",col=3, xlim=c(0,1), ylim=c(0,1),lwd=2,main = 'ROC curve')
-abline(0,1)r
+abline(0,1)
 
 seq(0.01,0.9,by=0.01)[which.max(res[,1])] #the threshold with the highest sensitivity
 
