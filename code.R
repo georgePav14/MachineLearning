@@ -10,8 +10,6 @@ eDis<-function(x,y){
 install.packages(c('corrgram','nnet','class','tree','MASS','pgmm','penalizedLDA','klaR',
                    'dplyr','ggplot2','scoring','e1071','randomForest','readxl','nortest'))
 
-install.packages('nortest')
-
 library(corrgram)
 library(nnet)
 library(class)
