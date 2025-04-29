@@ -7,7 +7,7 @@ eDis<-function(x,y){
 
 ##### packages installed #####
 # we need now to call them
-install.packages(c('corrgram','nnet','class','tree','MASS','pgmm','penalizedLDA','klaR',
+install.packages(c('corrgram','nnet','class','tree','MASS','pgmm','klaR',
                    'dplyr','ggplot2','scoring','e1071','randomForest','readxl','nortest'))
 
 library(corrgram)
@@ -16,7 +16,6 @@ library(class)
 library(tree)
 library(MASS)
 library(pgmm)
-library(penalizedLDA)
 library(klaR)
 library(dplyr)
 library(ggplot2)
@@ -229,124 +228,6 @@ par(mfrow=c(1,1))
 boxplot(bootLDA,main='Bootstrap',col=c('darkorange','darkblue'))
 
 summary(bootLDA)
-
-#### Penalized LDA ####
-pen<-PenalizedLDA(cont[,-1],as.numeric(cont[,1]),lambda=0.12,K=1,xte=cont[,-1])
-pen$discrim # the coefficient for age is 0 so its useless (if I also remove it from lda I get better results)
-pen$ypred
-predict(pen,xte=cont[,-1]) # predict the classes
-t<-table(cont[,1],pen$ypred)
-t[2,2]/sum(t[2,])
-
-### Run it many times
-B<-1000
-resultPLDA<-matrix(nrow=1000,ncol = 2)
-for ( i in 1:B) {
-  ind<- sample(1:nrow(x),nTrain,replace=FALSE)
-  train<- cont[ind,]
-  test<- cont[-ind,]
-  
-  m1<-PenalizedLDA(train[,-1],as.numeric(train[,1]),lambda=0.12,K=1,xte=test[,-1])
-  t<- table(test$SUBSCRIBED,m1$ypred)
-  resultPLDA[i,]<-c(t[2,2]/sum(t[2,]),sum(diag(t))/nrow(test))
-  if(i %% 100 == 0){
-    cat(paste0("Progress: ", round(i/10,2),"%."),"\n")
-  }
-}
-colnames(resultPLDA)=c('Sensitivity','Accuracy')
-
-hist(resultPLDA[,1],main='Histogram of the Test Sensitivity of 1000 runs (PLDA)')
-hist(resultPLDA[,2],main='Histogram of the Test Accuracy of 1000 runs (PLDA)')
-
-#####  k-fold cross validation 
-
-deiktes<-sample(1:nrow(cont))
-variab<-2:3
-crossPLDA<-matrix(ncol=2)
-folds<-c(2,3,4,5,7,10,12,15,20)
-
-for (omades in folds) {  # omades is the number of folds
-  k<-round((nrow(cont)/omades) - 1) # k is the number of observations per fold
-  t<-matrix(nrow=1,ncol=2) ; t2=NULL
-  
-  for (i in 1:omades) {
-    te<- deiktes[ ((i-1)*k+1):(i*k-1)]
-    train <- cont[-te,variab]
-    test <-   cont[te,variab]
-    z <-  PenalizedLDA(train,as.numeric(cont[-te,1]),lambda=0.12,K=1,xte=test)
-    pr<-  z$ypred
-    t<-table(cont[te,1],pr)
-    t2<- c(t2,t[2,2]/sum(t[2,])) # sensitivity TP / totalTruePositives
-    t3=sum(diag(t))/nrow(t)
-  }
-  crossPLDA<-rbind(crossPLDA,c(mean(t2),mean(t3)))
-}
-crossPLDA<-crossPLDA[-1,]
-
-rownames(crossPLDA)<-folds ; colnames(crossPLDA)=c('Sensitivity','Accuracy') ; crossPLDA
-
-########### bootstrap 
-B<-100
-variab<-2:3
-bootPLDA<-matrix(nrow=100,ncol=2)
-
-for ( j in 1:B) {
-  ind<- sample(1:nrow(cont),nrow(cont), replace=TRUE)
-  check<- 1:nrow(cont)
-  t<- check %in% unique(ind)
-  notin<- check[!t]
-  
-  train <- cont[ind,variab]
-  test <-   cont[notin,variab]
-  z <-  PenalizedLDA(train,as.numeric(cont[ind,1]),lambda=0.12,K=1,xte=test)
-  pr<-  z$ypred
-  t<-table(cont[notin,1],pr)
-  sens<- t[2,2]/sum(t[2,]) # sensitivity TP / totalTruePositives
-  acc=sum(diag(t))/nrow(test)
-  bootPLDA[j,]<- c(sens,   acc)
-  if(j %% 10 == 0){
-    cat(paste0("Progress: ", round(j/1,2),"%."),"\n")
-  }
-}
-rownames(bootPLDA)<-1:B ; colnames(bootPLDA)=c('Sensitivity','Accuracy') ; head(bootPLDA)
-
-par(mfrow=c(1,2))
-hist(bootPLDA[,1],xlab='Sensitivity',col='darkorange',main='')
-hist(bootPLDA[,2],xlab='Accuracy',col='darkblue',main='')
-mtext('Histogram of the Test Sensitivity and Accuracy of 100 runs by Bootstrap (PLDA)',side = 3,
-      line = - 2,outer = TRUE,cex=1.5)
-
-par(mfrow=c(1,1))
-boxplot(bootPLDA,main='Bootstrap',col=c('darkorange','darkblue'))
-
-summary(bootPLDA)
-
-# Find the optimum lambda by running multiple samples and lambda's
-possiblelambda<- seq(0.05,0.35,by=0.01) 
-lResult<-matrix(nrow=1000,ncol=length(possiblelambda))
-for( i in 1: 100){
-  ind<- sample(1:nrow(cont),nTrain,replace=FALSE)
-  train<- cont[ind,]
-  test<- cont[-ind,]
-  score<-NULL
-  for (lam in possiblelambda) {
-    pen<-PenalizedLDA(train[,-1],as.numeric(train[,1]),lambda=lam,K=1,xte=test[,-1])
-    t<-table(test[,1],pen$ypred)
-    score<-c(score,t[2,2]/sum(t[2,]))
-  }
-  if(i %% 10 == 0){
-    cat(paste0("Progress: ", round(i,2),"%."),"\n")
-  }
-  lResult[i,]<-score}
-
-lscore<-apply(lResult[!is.na(lResult[,1]),],2,mean)
-plot(possiblelambda,lscore,type = 'b',pch=18) # The 'best' lamda 0.12
-lambda=possiblelambda[which.max(lscore)] ; lambda 
-
-#plot the classification, black = no , red = yes
-plot(test[,-1],col=as.numeric(m2$class),pch=18) # predicted
-plot(test[,-1],col=test$SUBSCRIBED,pch=18) # the True
-plot(test[,-1],col=(m2$class==test$SUBSCRIBED)+1,pch=18) # false classification = black  ,correct = red
 
 
 ########### QDA ############
